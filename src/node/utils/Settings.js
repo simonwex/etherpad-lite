@@ -80,6 +80,7 @@ exports.abiword = null;
  */
 exports.loglevel = "INFO";
 
+<<<<<<< HEAD:src/node/utils/Settings.js
 /* This setting is used if you need authentication and/or
  * authorization. Note: /admin always requires authentication, and
  * either authorization by a module, or a user with is_admin set */
@@ -105,6 +106,15 @@ var settingsFilename = argv.settings || "settings.json";
 if (settingsFilename.charAt(0) != '/') {
     settingsFilename = path.normalize(path.join(root, settingsFilename));
 }
+=======
+/**
+ * xhr-polling duration
+ */
+exports.pollingDuration = 20;
+
+//read the settings sync
+var settingsStr = fs.readFileSync("../settings.json").toString();
+>>>>>>> basic support for cloudfoundry.:node/utils/Settings.js
 
 var settingsStr
 try{
@@ -182,6 +192,6 @@ if(vcapServices) {
         "database" : cred.name ,
       };
     }
-    console.log("database setup:" + console.dir(exports.dbSettings))
+    console.debug("database setup:" + console.dir(exports.dbSettings))
   }
 }
