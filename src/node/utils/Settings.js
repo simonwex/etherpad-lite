@@ -1,5 +1,5 @@
 /**
- * The Settings Modul reads the settings out of settings.json and provides 
+ * The Settings Modul reads the settings out of settings.json and provides
  * this information to the other modules
  */
 
@@ -32,7 +32,7 @@ exports.root = path.normalize(path.join(npm.dir, ".."));
  * The IP ep-lite should listen to
  */
 exports.ip = "0.0.0.0";
-  
+
 /**
  * The Port ep-lite should listen to
  */
@@ -155,4 +155,33 @@ for(var i in settings)
 
 if(exports.dbType === "dirty"){
   console.warn("DirtyDB is used. This is fine for testing but not recommended for production.")
+}
+
+// If deployed in CloudFoundry
+if(process.env.VCAP_APP_PORT) {
+  exports.port = process.env.VCAP_APP_PORT
+}
+
+
+// use mysql if provided.
+var vcapServices = process.env.VCAP_SERVICES;
+
+if(vcapServices) {
+  console.log("env VCAP_SERVICES:" + console.dir(vcapServices))
+  var svcs = JSON.parse(vcapServices)
+  for(var key in svcs ) {
+    var svc = svcs[key]
+    console.log("service:" + svc)
+    if( key.match(/^mysql/) ) {
+      exports.dbType= "mysql";
+      var cred = svc[0].credentials
+      exports.dbSettings = {
+        "user" : cred.user ,
+        "host" : cred.host ,
+        "password" : cred.password ,
+        "database" : cred.name ,
+      };
+    }
+    console.log("database setup:" + console.dir(exports.dbSettings))
+  }
 }
