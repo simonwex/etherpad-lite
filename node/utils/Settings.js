@@ -1,5 +1,5 @@
 /**
- * The Settings Modul reads the settings out of settings.json and provides 
+ * The Settings Modul reads the settings out of settings.json and provides
  * this information to the other modules
  */
 
@@ -25,7 +25,7 @@ var fs = require("fs");
  * The IP ep-lite should listen to
  */
 exports.ip = "0.0.0.0";
-  
+
 /**
  * The Port ep-lite should listen to
  */
@@ -95,5 +95,34 @@ for(var i in settings)
   {
     console.warn("Unkown Setting: '" + i + "'");
     console.warn("This setting doesn't exist or it was removed");
+  }
+}
+
+// If deployed in CloudFoundry
+if(process.env.VCAP_APP_PORT) {
+  exports.port = process.env.VCAP_APP_PORT
+}
+
+
+// use mysql if provided.
+var vcap_services = process.env.VCAP_SERVICES;
+
+if(vcap_services) {
+  console.log("env VCAP_SERVICES:" + console.dir(vcap_services))
+  var svcs = JSON.parse(vcap_services)
+  for(var key in svcs ) {
+    var svc = svcs[key]
+    console.log("service:" + svc)
+    if( key.match(/^mysql/) ) {
+      exports.dbType= "mysql";
+      var cred = svc[0].credentials
+      exports.dbSettings = {
+        "user" : cred.user ,
+        "host" : cred.host ,
+        "password" : cred.password ,
+        "database" : cred.name ,
+      };
+    }
+    console.log("database setup:" + console.dir(exports.dbSettings))
   }
 }
