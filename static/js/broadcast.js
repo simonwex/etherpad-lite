@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +20,17 @@
  * limitations under the License.
  */
 
-var global = this;
+var makeCSSManager = require('/cssmanager_client').makeCSSManager;
+var domline = require('/domline_client').domline;
+var Changeset = require('/easysync2_client').Changeset;
+var AttribPool = require('/easysync2_client').AttribPool;
+var linestylefilter = require('/linestylefilter_client').linestylefilter;
 
-function loadBroadcastJS()
+// These parameters were global, now they are injected. A reference to the
+// Timeslider controller would probably be more appropriate.
+function loadBroadcastJS(socket, sendSocketMsg, fireWhenAllScriptsAreLoaded, BroadcastSlider)
 {
+  var changesetLoader = undefined;
   // just in case... (todo: this must be somewhere else in the client code.)
   // Below Array#map code was direct pasted by AppJet/Etherpad, licence unknown. Possible source: http://www.tutorialspoint.com/javascript/array_map.htm
   if (!Array.prototype.map)
@@ -411,7 +424,7 @@ function loadBroadcastJS()
     }));
   }
 
-  global.changesetLoader = {
+  changesetLoader = {
     running: false,
     resolved: [],
     requestQueue1: [],
@@ -751,4 +764,8 @@ function loadBroadcastJS()
   }
 
   receiveAuthorData(clientVars.historicalAuthorData);
+
+  return changesetLoader;
 }
+
+exports.loadBroadcastJS = loadBroadcastJS;

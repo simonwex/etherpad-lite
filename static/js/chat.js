@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc., 2011 Peter 'Pita' Martischka (Primary Technology Ltd)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,61 +20,61 @@
  * limitations under the License.
  */
 
+var padutils = require('/pad_utils').padutils;
+var padcookie = require('/pad_cookie').padcookie;
+
 var chat = (function()
 {
+  var isStuck = false;
+  var chatMentions = 0;
+  var title = document.title;
   var self = {
     show: function () 
     {      
-      $("#chaticon").hide("slide", {
-        direction: "down"
-      }, 500, function ()
-      {
-        $("#chatbox").show("slide", {
-          direction: "down"
-        }, 750, self.scrollDown);
-        $("#chatbox").resizable(
-        {
-          handles: 'nw',
-          start: function (event, ui)
-          {
-            $("#focusprotector").show();
-          },
-          stop: function (event, ui)
-          {
-            $("#focusprotector").hide();
-            
-            $("#chatbox").css({right: "20px", bottom: "0px", left: "", top: ""});
-            
-            self.scrollDown();
-          }
-        });
-      });
+      $("#chaticon").hide();
+      $("#chatbox").show();
+      self.scrollDown();
+      chatMentions = 0;
+      document.title = title;
+    },
+    stickToScreen: function(fromInitialCall) // Make chat stick to right hand side of screen
+    {
+      chat.show();
+      if(!isStuck || fromInitialCall) { // Stick it to
+        padcookie.setPref("chatAlwaysVisible", true);
+        $('#chatbox').css({"right":"0px", "top":"36px", "border-radius":"0px", "height":"auto", "border-right":"none", "border-left":"1px solid #ccc", "border-top":"none", "background-color":"#f1f1f1", "width":"185px"});
+        $('#chattext').css({"top":"0px"});
+        $('#editorcontainer').css({"right":"192px", "width":"auto"});
+        isStuck = true;
+      } else { // Unstick it
+        padcookie.setPref("chatAlwaysVisible", false);
+        $('#chatbox').css({"right":"20px", "top":"auto", "border-top-left-radius":"5px", "border-top-right-radius":"5px", "border-right":"1px solid #999", "height":"200px", "border-top":"1px solid #999", "background-color":"#f7f7f7"});
+        $('#chattext').css({"top":"25px"});
+        $('#editorcontainer').css({"right":"0px", "width":"100%"});
+        isStuck = false;
+      }
     },
     hide: function () 
     {
       $("#chatcounter").text("0");
-      $("#chatbox").hide("slide", { direction: "down" }, 750, function()
-      {
-        $("#chaticon").show("slide", { direction: "down" }, 500);
-      });
+      $("#chaticon").show();
+      $("#chatbox").hide();
     },
     scrollDown: function()
     {
-      //console.log($('#chatbox').css("display"));
-    
       if($('#chatbox').css("display") != "none")
         $('#chattext').animate({scrollTop: $('#chattext')[0].scrollHeight}, "slow");
     }, 
     send: function()
     {
       var text = $("#chatinput").val();
-      pad.collabClient.sendMessage({"type": "CHAT_MESSAGE", "text": text});
+      this._pad.collabClient.sendMessage({"type": "CHAT_MESSAGE", "text": text});
       $("#chatinput").val("");
     },
     addMessage: function(msg, increment)
     {    
       //correct the time
-      msg.time += pad.clientTimeOffset; 
+      msg.time += this._pad.clientTimeOffset;
       
       //create the time string
       var minutes = "" + new Date(msg.time).getMinutes();
@@ -87,6 +93,17 @@ var chat = (function()
       });
 
       var text = padutils.escapeHtmlWithClickableLinks(padutils.escapeHtml(msg.text), "_blank");
+
+      /* Performs an action if your name is mentioned */
+      var myName = $('#myusernameedit').val();
+      myName = myName.toLowerCase();
+      var chatText = text.toLowerCase();
+      var wasMentioned = false;
+      if (chatText.indexOf(myName) !== -1 && myName != "undefined"){
+        wasMentioned = true;
+      }
+      /* End of new action */
+
       var authorName = msg.userName == null ? "unnamed" : padutils.escapeHtml(msg.userName); 
       
       var html = "<p class='" + authorClass + "'><b>" + authorName + ":</b><span class='time'>" + timeStr + "</span> " + text + "</p>";
@@ -98,16 +115,28 @@ var chat = (function()
         var count = Number($("#chatcounter").text());
         count++;
         $("#chatcounter").text(count);
-        // chat throb stuff -- Just make it throb in for ~2 secs then fadeotu
-        $('#chatthrob').html("<b>"+authorName+"</b>" + ": " + text);
-        $('#chatthrob').effect("pulsate", {times:1,mode:"hide"},2000);
+        // chat throb stuff -- Just make it throw for twice as long
+        if(wasMentioned)
+        { // If the user was mentioned show for twice as long and flash the browser window
+          if (chatMentions == 0){
+            title = document.title;
+          }
+          $('#chatthrob').html("<b>"+authorName+"</b>" + ": " + text).show().delay(4000).hide(400);
+          chatMentions++;
+          document.title = "("+chatMentions+") " + title;
+        }
+        else
+        {
+          $('#chatthrob').html("<b>"+authorName+"</b>" + ": " + text).show().delay(2000).hide(400);
+        }
       }
       
       self.scrollDown();
 
     },
-    init: function()
+    init: function(pad)
     {
+      this._pad = pad;
       $("#chatinput").keypress(function(evt)
       {
         //if the user typed enter, fire the send
@@ -128,3 +157,6 @@ var chat = (function()
 
   return self;
 }());
+
+exports.chat = chat;
+

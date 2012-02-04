@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +19,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-var global = this;
 
-function loadBroadcastSliderJS()
+ // These parameters were global, now they are injected. A reference to the
+ // Timeslider controller would probably be more appropriate.
+function loadBroadcastSliderJS(fireWhenAllScriptsAreLoaded)
 {
+  var BroadcastSlider;
 
   (function()
   { // wrap this code in its own namespace
@@ -197,7 +205,7 @@ function loadBroadcastSliderJS()
       }
     }
 
-    global.BroadcastSlider = {
+    BroadcastSlider = {
       onSlider: onSlider,
       getSliderPosition: getSliderPosition,
       setSliderPosition: setSliderPosition,
@@ -489,4 +497,8 @@ function loadBroadcastSliderJS()
   {
     $("#viewlatest").html(loc == BroadcastSlider.getSliderLength() ? "Viewing latest content" : "View latest content");
   })
+
+  return BroadcastSlider;
 }
+
+exports.loadBroadcastSliderJS = loadBroadcastSliderJS;

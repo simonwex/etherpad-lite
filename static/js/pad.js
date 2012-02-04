@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc., 2011 Peter 'Pita' Martischka (Primary Technology Ltd)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,22 +23,27 @@
 /* global $, window */
 
 var socket;
-var LineNumbersDisabled = false;
-var useMonospaceFontGlobal = false;
-var globalUserName = false;
 
-$(document).ready(function()
-{
-  //start the costum js
-  if(typeof costumStart == "function") costumStart();
-  getParams();
-  handshake();
-});
+// These jQuery things should create local references, but for now `require()`
+// assigns to the global `$` and augments it with plugins.
+require('/jquery');
+require('/farbtastic');
+require('/excanvas');
+JSON = require('/json2');
+require('/undo-xpopup');
 
-$(window).unload(function()
-{
-  pad.dispose();
-});
+var chat = require('/chat').chat;
+var getCollabClient = require('/collab_client').getCollabClient;
+var padconnectionstatus = require('/pad_connectionstatus').padconnectionstatus;
+var padcookie = require('/pad_cookie').padcookie;
+var paddocbar = require('/pad_docbar').paddocbar;
+var padeditbar = require('/pad_editbar').padeditbar;
+var padeditor = require('/pad_editor').padeditor;
+var padimpexp = require('/pad_impexp').padimpexp;
+var padmodals = require('/pad_modals').padmodals;
+var padsavedrevs = require('/pad_savedrevs').padsavedrevs;
+var paduserlist = require('/pad_userlist').paduserlist;
+var padutils = require('/pad_utils').padutils;
 
 function createCookie(name, value, days, path)
 {
@@ -78,11 +89,24 @@ function randomString()
 
 function getParams()
 {
-  var showControls = getUrlVars()["showControls"];
-  var showChat = getUrlVars()["showChat"];
-  var userName = getUrlVars()["userName"];
-  var showLineNumbers = getUrlVars()["showLineNumbers"];
-  var useMonospaceFont = getUrlVars()["useMonospaceFont"];
+  var params = getUrlVars()
+  var showControls = params["showControls"];
+  var showChat = params["showChat"];
+  var userName = params["userName"];
+  var showLineNumbers = params["showLineNumbers"];
+  var useMonospaceFont = params["useMonospaceFont"];
+  var IsnoColors = params["noColors"];
+  var hideQRCode = params["hideQRCode"];
+  var rtl = params["rtl"];
+
+  if(IsnoColors)
+  {
+    if(IsnoColors == "true")
+    {
+      settings.noColors = true;
+      $('#clearAuthorship').hide();
+    }
+  }
   if(showControls)
   {
     if(showControls == "false")
@@ -91,7 +115,6 @@ function getParams()
       $('#editorcontainer').css({"top":"0px"});
     }
   }
-
   if(showChat)
   {
     if(showChat == "false")
@@ -99,28 +122,35 @@ function getParams()
       $('#chaticon').hide();
     }
   }
-
   if(showLineNumbers)
   {
     if(showLineNumbers == "false")
     {
-      LineNumbersDisabled = true;
+      settings.LineNumbersDisabled = true;
     }
   }
-
   if(useMonospaceFont)
   {
     if(useMonospaceFont == "true")
     {
-      useMonospaceFontGlobal = true;
+      settings.useMonospaceFontGlobal = true;
     }
   }
-
-
   if(userName)
   {
     // If the username is set as a parameter we should set a global value that we can call once we have initiated the pad.
-    globalUserName = userName;
+    settings.globalUserName = unescape(userName);
+  }
+  if(hideQRCode)
+  {
+    $('#qrcode').hide();
+  }
+  if(rtl)
+  {
+    if(rtl == "true")
+    {
+      settings.rtlIsTrue = true
+    }
   }
 }
 
@@ -155,16 +185,18 @@ function handshake()
   //find out in which subfolder we are
   var resource = loc.pathname.substr(1, loc.pathname.indexOf("/p/")) + "socket.io";
   //connect
-  socket = io.connect(url, {
-    resource: resource
+  socket = pad.socket = io.connect(url, {
+    resource: resource,
+    'max reconnection attempts': 3
   });
 
-  socket.once('connect', function()
+  function sendClientReady(isReconnect)
   {
     var padId = document.location.pathname.substring(document.location.pathname.lastIndexOf("/") + 1);
-    padId = unescape(padId); // unescape neccesary due to Safari and Opera interpretation of spaces
+    padId = decodeURIComponent(padId); // unescape neccesary due to Safari and Opera interpretation of spaces
 
-    document.title = document.title + " | " + padId;
+    if(!isReconnect)
+      document.title = padId.replace(/_+/g, ' ') + " | " + document.title;
 
     var token = readCookie("token");
     if (token == null)
@@ -185,7 +217,43 @@ function handshake()
       "token": token,
       "protocolVersion": 2
     };
+    
+    //this is a reconnect, lets tell the server our revisionnumber
+    if(isReconnect == true)
+    {
+      msg.client_rev=pad.collabClient.getCurrentRevisionNumber();
+      msg.reconnect=true;
+    }
+    
     socket.json.send(msg);
+  };
+
+  var disconnectTimeout;
+
+  socket.once('connect', function () {
+    sendClientReady(false);
+  });
+  
+  socket.on('reconnect', function () {
+    //reconnect is before the timeout, lets stop the timeout
+    if(disconnectTimeout)
+    {
+      clearTimeout(disconnectTimeout);
+    }
+
+    pad.collabClient.setChannelState("CONNECTED");
+    sendClientReady(true);
+  });
+  
+  socket.on('disconnect', function () {
+    function disconnectEvent()
+    {
+      pad.collabClient.setChannelState("DISCONNECTED", "reconnect_timeout");
+    }
+    
+    pad.collabClient.setChannelState("RECONNECTING");
+    
+    disconnectTimeout = setTimeout(disconnectEvent, 10000);
   });
 
   var receivedClientVars = false;
@@ -204,13 +272,13 @@ function handshake()
       {
         $("#editorloadingbox").html("<b>You need a password to access this pad</b><br>" +
                                     "<input id='passwordinput' type='password' name='password'>"+
-                                    "<button type='button' onclick='savePassword()'>ok</button>");
+                                    "<button type='button' onclick=\"" + padutils.escapeHtml('require('+JSON.stringify(module.id)+").savePassword()") + "\">ok</button>");
       }
       else if(obj.accessStatus == "wrongPassword")
       {
         $("#editorloadingbox").html("<b>You're password was wrong</b><br>" +
                                     "<input id='passwordinput' type='password' name='password'>"+
-                                    "<button type='button' onclick='savePassword()'>ok</button>");
+                                    "<button type='button' onclick=\"" + padutils.escapeHtml('require('+JSON.stringify(module.id)+").savePassword()") + "\">ok</button>");
       }
     }
     
@@ -228,24 +296,37 @@ function handshake()
       clientVars.collab_client_vars.clientAgent = "Anonymous";
 
       //initalize the pad
-      pad.init();
+      pad._afterHandshake();
       initalized = true;
 
       // If the LineNumbersDisabled value is set to true then we need to hide the Line Numbers
-      if (LineNumbersDisabled == true)
+      if (settings.LineNumbersDisabled == true)
       {
         pad.changeViewOption('showLineNumbers', false);
       }
+
+      // If the noColors value is set to true then we need to hide the backround colors on the ace spans
+      if (settings.noColors == true)
+      {
+        pad.changeViewOption('noColors', true);
+      }
+      
+      if (settings.rtlIsTrue == true)
+      {
+        pad.changeViewOption('rtl', true);
+      }
+
       // If the Monospacefont value is set to true then change it to monospace.
-      if (useMonospaceFontGlobal == true)
+      if (settings.useMonospaceFontGlobal == true)
       {
         pad.changeViewOption('useMonospaceFont', true);
       }
       // if the globalUserName value is set we need to tell the server and the client about the new authorname
-      if (globalUserName !== false)
+      if (settings.globalUserName !== false)
       {
-        pad.notifyChangeName(globalUserName); // Notifies the server
-        $('#myusernameedit').attr({"value":globalUserName}); // Updates the current users UI
+        pad.notifyChangeName(settings.globalUserName); // Notifies the server
+        pad.myUserInfo.name = settings.globalUserName;
+        $('#myusernameedit').attr({"value":settings.globalUserName}); // Updates the current users UI
       }
     }
     //This handles every Message after the clientVars
@@ -264,7 +345,6 @@ function handshake()
       }
     }
   });
-
   // Bind the colorpicker
   var fb = $('#colorpicker').farbtastic({ callback: '#mycolorpickerpreview', width: 220});
 }
@@ -329,11 +409,27 @@ var pad = {
 
   init: function()
   {
+    padutils.setupGlobalExceptionHandler();
+
+    $(document).ready(function()
+    {
+      //start the costum js
+      if(typeof costumStart == "function") costumStart();
+      getParams();
+      handshake();
+    });
+
+    $(window).unload(function()
+    {
+      pad.dispose();
+    });
+  },
+  _afterHandshake: function()
+  {
     pad.clientTimeOffset = new Date().getTime() - clientVars.serverTimestamp;
   
     //initialize the chat
-    chat.init();
-    pad.diagnosticInfo.uniqueId = padutils.uniqueId();
+    chat.init(this);
     pad.initTime = +(new Date());
     pad.padOptions = clientVars.initialOptions;
 
@@ -354,10 +450,10 @@ var pad = {
     }
 
     // order of inits is important here:
-    padcookie.init(clientVars.cookiePrefsToSet);
-
+    padcookie.init(clientVars.cookiePrefsToSet, this);
+  
     $("#widthprefcheck").click(pad.toggleWidthPref);
-    $("#sidebarcheck").click(pad.toggleSidebar);
+    // $("#sidebarcheck").click(pad.togglewSidebar);
 
     pad.myUserInfo = {
       userId: clientVars.userId,
@@ -381,20 +477,20 @@ var pad = {
       initialTitle: clientVars.initialTitle,
       initialPassword: clientVars.initialPassword,
       guestPolicy: pad.padOptions.guestPolicy
-    });
-    padimpexp.init();
-    padsavedrevs.init(clientVars.initialRevisionList);
+    }, this);
+    padimpexp.init(this);
+    padsavedrevs.init(clientVars.initialRevisionList, this);
 
-    padeditor.init(postAceInit, pad.padOptions.view || {});
+    padeditor.init(postAceInit, pad.padOptions.view || {}, this);
 
-    paduserlist.init(pad.myUserInfo);
+    paduserlist.init(pad.myUserInfo, this);
     //    padchat.init(clientVars.chatHistory, pad.myUserInfo);
     padconnectionstatus.init();
-    padmodals.init();
+    padmodals.init(this);
 
     pad.collabClient = getCollabClient(padeditor.ace, clientVars.collab_client_vars, pad.myUserInfo, {
       colorPalette: pad.getColorPalette()
-    });
+    }, pad);
     pad.collabClient.setOnUserJoin(pad.handleUserJoin);
     pad.collabClient.setOnUpdateUserInfo(pad.handleUserUpdate);
     pad.collabClient.setOnUserLeave(pad.handleUserLeave);
@@ -630,7 +726,22 @@ var pad = {
     else if (newState == "DISCONNECTED")
     {
       pad.diagnosticInfo.disconnectedMessage = message;
-      pad.diagnosticInfo.padInitTime = pad.initTime;
+      pad.diagnosticInfo.padId = pad.getPadId();
+      pad.diagnosticInfo.socket = {};
+      
+      //we filter non objects from the socket object and put them in the diagnosticInfo 
+      //this ensures we have no cyclic data - this allows us to stringify the data
+      for(var i in socket.socket)
+      {
+        var value = socket.socket[i];
+        var type = typeof value;
+        
+        if(type == "string" || type == "number")
+        {
+          pad.diagnosticInfo.socket[i] = value;
+        }
+      }
+    
       pad.asyncSendDiagnosticInfo();
       if (typeof window.ajlog == "string")
       {
@@ -667,15 +778,17 @@ var pad = {
 
     padsavedrevs.handleIsFullyConnected(isConnected);
 
-    pad.determineSidebarVisibility(isConnected && !isInitialConnect);
+    // pad.determineSidebarVisibility(isConnected && !isInitialConnect);
+    pad.determineChatVisibility(isConnected && !isInitialConnect);
+
   },
-  determineSidebarVisibility: function(asNowConnectedFeedback)
+/*  determineSidebarVisibility: function(asNowConnectedFeedback)
   {
     if (pad.isFullyConnected())
     {
       var setSidebarVisibility = padutils.getCancellableAction("set-sidebar-visibility", function()
       {
-        $("body").toggleClass('hidesidebar', !! padcookie.getPref('hideSidebar'));
+        // $("body").toggleClass('hidesidebar', !! padcookie.getPref('hideSidebar'));
       });
       window.setTimeout(setSidebarVisibility, asNowConnectedFeedback ? 3000 : 0);
     }
@@ -683,6 +796,17 @@ var pad = {
     {
       padutils.cancelActions("set-sidebar-visibility");
       $("body").removeClass('hidesidebar');
+    }
+  },
+*/
+  determineChatVisibility: function(asNowConnectedFeedback){
+    var chatVisCookie = padcookie.getPref('chatAlwaysVisible');
+    if(chatVisCookie){ // if the cookie is set for chat always visible
+      chat.stickToScreen(true); // stick it to the screen
+      $('#options-stickychat').prop("checked", true); // set the checkbox to on
+    }
+    else{
+      $('#options-stickychat').prop("checked", false); // set the checkbox for off
     }
   },
   handleCollabAction: function(action)
@@ -702,7 +826,6 @@ var pad = {
   },
   asyncSendDiagnosticInfo: function()
   {
-    pad.diagnosticInfo.collabDiagnosticInfo = pad.collabClient.getDiagnosticInfo();
     window.setTimeout(function()
     {
       $.ajax(
@@ -710,7 +833,6 @@ var pad = {
         type: 'post',
         url: '/ep/pad/connection-diagnostic-info',
         data: {
-          padId: pad.getPadId(),
           diagnosticInfo: JSON.stringify(pad.diagnosticInfo)
         },
         success: function()
@@ -735,6 +857,7 @@ var pad = {
     $("#widthprefcheck").toggleClass('widthprefchecked', !! newValue).toggleClass('widthprefunchecked', !newValue);
     pad.handleWidthChange();
   },
+/*
   toggleSidebar: function()
   {
     var newValue = !padcookie.getPref('hideSidebar');
@@ -742,6 +865,7 @@ var pad = {
     $("#sidebarcheck").toggleClass('sidebarchecked', !newValue).toggleClass('sidebarunchecked', !! newValue);
     pad.determineSidebarVisibility();
   },
+*/
   handleWidthChange: function()
   {
     var isFullWidth = padcookie.getPref('fullWidth');
@@ -790,7 +914,7 @@ var pad = {
   },
   preloadImages: function()
   {
-    var images = []; // Removed as we now use CSS and JS for colorpicker
+    var images = ["../static/img/connectingbar.gif"];
 
     function loadNextImage()
     {
@@ -860,3 +984,30 @@ var alertBar = (function()
   };
   return self;
 }());
+
+function init() {
+  return pad.init();
+}
+
+var settings = {
+  LineNumbersDisabled: false
+, noColors: false
+, useMonospaceFontGlobal: false
+, globalUserName: false
+, hideQRCode: false
+, rtlIsTrue: false
+};
+
+pad.settings = settings;
+
+exports.settings = settings;
+exports.createCookie = createCookie;
+exports.readCookie = readCookie;
+exports.randomString = randomString;
+exports.getParams = getParams;
+exports.getUrlVars = getUrlVars;
+exports.savePassword = savePassword;
+exports.handshake = handshake;
+exports.pad = pad;
+exports.init = init;
+exports.alertBar = alertBar;

@@ -18,8 +18,11 @@
  * limitations under the License.
  */
 
+var ERR = require("async-stacktrace");
 var db = require("./DB").db;
 var async = require("async");
+
+var randomString = require("../utils/randomstring");
 
 /**
  * Checks if the author exists
@@ -29,7 +32,8 @@ exports.doesAuthorExists = function (authorID, callback)
   //check if the database entry of this author exists
   db.get("globalAuthor:" + authorID, function (err, author)
   {
-    callback(err, author != null);
+    if(ERR(err, callback)) return;
+    callback(null, author != null);
   });
 }
 
@@ -42,8 +46,9 @@ exports.getAuthor4Token = function (token, callback)
 {
   mapAuthorWithDBKey("token2author", token, function(err, author)
   {
+    if(ERR(err, callback)) return;
     //return only the sub value authorID
-    callback(err, author ? author.authorID : author);
+    callback(null, author ? author.authorID : author);
   });
 }
 
@@ -56,12 +61,7 @@ exports.createAuthorIfNotExistsFor = function (authorMapper, name, callback)
 {
   mapAuthorWithDBKey("mapper2author", authorMapper, function(err, author)
   {
-    //error?
-    if(err)
-    {
-      callback(err);
-      return;
-    }
+    if(ERR(err, callback)) return;
     
     //set the name of this author
     if(name)
@@ -84,24 +84,14 @@ function mapAuthorWithDBKey (mapperkey, mapper, callback)
   //try to map to an author
   db.get(mapperkey + ":" + mapper, function (err, author)
   {
-    //error?
-    if(err)
-    {
-      callback(err);
-      return;
-    }
+    if(ERR(err, callback)) return;
   
     //there is no author with this mapper, so create one
     if(author == null)
     {
       exports.createAuthor(null, function(err, author)
       {
-        //error?
-        if(err)
-        {
-          callback(err);
-          return;
-        }
+        if(ERR(err, callback)) return;
         
         //create the token2author relation
         db.set(mapperkey + ":" + mapper, author.authorID);
@@ -188,19 +178,4 @@ exports.getAuthorName = function (author, callback)
 exports.setAuthorName = function (author, name, callback)
 {
   db.setSub("globalAuthor:" + author, ["name"], name, callback);
-}
-
-/**
- * Generates a random String with the given length. Is needed to generate the Author Ids
- */
-function randomString(len) 
-{
-  var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  var randomstring = '';
-  for (var i = 0; i < len; i++)
-  {
-    var rnum = Math.floor(Math.random() * chars.length);
-    randomstring += chars.substring(rnum, rnum + 1);
-  }
-  return randomstring;
 }

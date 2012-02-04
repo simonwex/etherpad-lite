@@ -18,6 +18,9 @@
  * limitations under the License.
  */
  
+var ERR = require("async-stacktrace");
+var customError = require("../utils/customError");
+var randomString = require("../utils/randomstring");
 var db = require("./DB").db;
 var async = require("async");
 var padManager = require("./PadManager");
@@ -34,15 +37,12 @@ exports.deleteGroup = function(groupID, callback)
       //try to get the group entry
       db.get("group:" + groupID, function (err, _group)
       {
-        //error
-        if(err) 
-        {
-          callback(err);
-        }
+        if(ERR(err, callback)) return;
+        
         //group does not exist
-        else if(_group == null)
+        if(_group == null)
         {
-          callback({stop: "groupID does not exist"});
+          callback(new customError("groupID does not exist","apierror"));
         }
         //group exists, everything is fine
         else
@@ -67,7 +67,7 @@ exports.deleteGroup = function(groupID, callback)
       {
         padManager.getPad(padID, function(err, pad)
         {
-          if(err) {callback(err); return}
+          if(ERR(err, callback)) return;
           
           pad.remove(callback);
         });
@@ -79,7 +79,7 @@ exports.deleteGroup = function(groupID, callback)
       //try to get the group entry
       db.get("group2sessions:" + groupID, function (err, group2sessions)
       {
-        if(err) {callback(err); return}
+        if(ERR(err, callback)) return;
         
         //skip if there is no group2sessions entry
         if(group2sessions == null) {callback(); return}
@@ -107,7 +107,8 @@ exports.deleteGroup = function(groupID, callback)
     }
   ], function(err)
   {
-    callback(err);
+    if(ERR(err, callback)) return;
+    callback();
   });
 }
  
@@ -116,7 +117,8 @@ exports.doesGroupExist = function(groupID, callback)
   //try to get the group entry
   db.get("group:" + groupID, function (err, group)
   {
-    callback(err, group != null);
+    if(ERR(err, callback)) return;
+    callback(null, group != null);
   });
 }
 
@@ -135,30 +137,21 @@ exports.createGroupIfNotExistsFor = function(groupMapper, callback)
   //ensure mapper is optional
   if(typeof groupMapper != "string")
   {
-    callback({stop: "groupMapper is no string"});
+    callback(new customError("groupMapper is no string","apierror"));
     return;
   }
   
   //try to get a group for this mapper
   db.get("mapper2group:"+groupMapper, function(err, groupID)
   {
-     if(err)
-     {
-       callback(err);
-       return;
-     }
+     if(ERR(err, callback)) return;
      
      //there is no group for this mapper, let's create a group
      if(groupID == null)
      {
        exports.createGroup(function(err, responseObj)
        {
-         //check for errors
-         if(err)
-         {
-           callback(err);
-           return;
-         }
+         if(ERR(err, callback)) return;
          
          //create the mapper entry for this group
          db.set("mapper2group:"+groupMapper, responseObj.groupID);
@@ -169,7 +162,8 @@ exports.createGroupIfNotExistsFor = function(groupMapper, callback)
      //there is a group for this mapper, let's return it
      else
      {
-       callback(err, {groupID: groupID});
+       if(ERR(err, callback)) return;
+       callback(null, {groupID: groupID});
      }
   });
 }
@@ -185,15 +179,12 @@ exports.createGroupPad = function(groupID, padName, text, callback)
     {
       exports.doesGroupExist(groupID, function(err, exists)
       {
-        //error
-        if(err) 
-        {
-          callback(err);
-        }
+        if(ERR(err, callback)) return;
+        
         //group does not exist
-        else if(exists == false)
+        if(exists == false)
         {
-          callback({stop: "groupID does not exist"});
+          callback(new customError("groupID does not exist","apierror"));
         }
         //group exists, everything is fine
         else
@@ -207,15 +198,12 @@ exports.createGroupPad = function(groupID, padName, text, callback)
     {
       padManager.doesPadExists(padID, function(err, exists)
       {
-        //error
-        if(err) 
-        {
-          callback(err);
-        }
+        if(ERR(err, callback)) return;
+        
         //pad exists already
-        else if(exists == true)
+        if(exists == true)
         {
-          callback({stop: "padName does already exist"});
+          callback(new customError("padName does already exist","apierror"));
         }
         //pad does not exist, everything is fine
         else
@@ -229,7 +217,8 @@ exports.createGroupPad = function(groupID, padName, text, callback)
     {
       padManager.getPad(padID, text, function(err)
       {
-        callback(err);
+        if(ERR(err, callback)) return;
+        callback();
       });
     },
     //create an entry in the group for this pad
@@ -240,7 +229,8 @@ exports.createGroupPad = function(groupID, padName, text, callback)
     }
   ], function(err)
   {
-    callback(err, {padID: padID});
+    if(ERR(err, callback)) return;
+    callback(null, {padID: padID});
   });
 }
 
@@ -248,38 +238,21 @@ exports.listPads = function(groupID, callback)
 {
   exports.doesGroupExist(groupID, function(err, exists)
   {
-    //error
-    if(err) 
-    {
-      callback(err);
-    }
+    if(ERR(err, callback)) return;
+    
     //group does not exist
-    else if(exists == false)
+    if(exists == false)
     {
-      callback({stop: "groupID does not exist"});
+      callback(new customError("groupID does not exist","apierror"));
     }
     //group exists, let's get the pads
     else
     {
       db.getSub("group:" + groupID, ["pads"], function(err, pads)
       {
-        callback(err, {padIDs: pads});
+        if(ERR(err, callback)) return;
+        callback(null, {padIDs: pads});
       });
     }
   });
-}
-
-/**
- * Generates a random String with the given length. Is needed to generate the Author Ids
- */
-function randomString(len) 
-{
-  var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  var randomstring = '';
-  for (var i = 0; i < len; i++)
-  {
-    var rnum = Math.floor(Math.random() * chars.length);
-    randomstring += chars.substring(rnum, rnum + 1);
-  }
-  return randomstring;
 }

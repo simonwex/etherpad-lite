@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +22,6 @@
 // revision info is a skip list whos entries represent a particular revision
 // of the document.  These revisions are connected together by various
 // changesets,  or deltas, between any two revisions.
-var global = this;
 
 function loadBroadcastRevisionsJS()
 {
@@ -119,3 +124,5 @@ function loadBroadcastRevisionsJS()
     };
   }
 }
+
+exports.loadBroadcastRevisionsJS = loadBroadcastRevisionsJS;

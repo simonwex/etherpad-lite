@@ -18,8 +18,11 @@
  * limitations under the License.
  */
 
+var ERR = require("async-stacktrace");
 var fs = require("fs");
 var api = require("../db/API");
+var padManager = require("../db/PadManager");
+var randomString = require("../utils/randomstring");
 
 //ensure we have an apikey
 var apikey = null;
@@ -50,6 +53,8 @@ var functions = {
   "listSessionsOfAuthor"      : ["authorID"], 
   "getText"                   : ["padID", "rev"],
   "setText"                   : ["padID", "text"],
+  "getHTML"                   : ["padID", "rev"],
+  "setHTML"                   : ["padID", "html"],
   "getRevisionsCount"         : ["padID"], 
   "deletePad"                 : ["padID"], 
   "getReadOnlyID"             : ["padID"],
@@ -69,7 +74,7 @@ var functions = {
 exports.handle = function(functionName, fields, req, res)
 {
   //check the api key!
-  if(fields["apikey"] != apikey)
+  if(fields["apikey"] != apikey.trim())
   {
     res.send({code: 4, message: "no or wrong API Key", data: null});
     return;
@@ -92,7 +97,33 @@ exports.handle = function(functionName, fields, req, res)
     res.send({code: 3, message: "no such function", data: null});
     return;
   }
-  
+
+  //sanitize any pad id's before continuing
+  if(fields["padID"])
+  {
+    padManager.sanitizePadId(fields["padID"], function(padId)
+    {
+      fields["padID"] = padId;
+      callAPI(functionName, fields, req, res);
+    });
+  }
+  else if(fields["padName"])
+  {
+    padManager.sanitizePadId(fields["padName"], function(padId)
+    {
+      fields["padName"] = padId;
+      callAPI(functionName, fields, req, res);
+    });
+  }
+  else
+  {
+    callAPI(functionName, fields, req, res);
+  }
+}
+
+//calls the api function
+function callAPI(functionName, fields, req, res)
+{
   //put the function parameters in an array
   var functionParams = [];
   for(var i=0;i<functions[functionName].length;i++)
@@ -112,33 +143,18 @@ exports.handle = function(functionName, fields, req, res)
       res.send({code: 0, message: "ok", data: data});
     }
     // parameters were wrong and the api stopped execution, pass the error
-    else if(err.stop)
+    else if(err.name == "apierror")
     {
-      res.send({code: 1, message: err.stop, data: null});
+      res.send({code: 1, message: err.message, data: null});
     }
     //an unkown error happend
     else
     {
       res.send({code: 2, message: "internal error", data: null});
-      throw (err);
+      ERR(err);
     }
   });
   
   //call the api function
   api[functionName](functionParams[0],functionParams[1],functionParams[2],functionParams[3],functionParams[4]);
-}
-
-/**
- * Generates a random String with the given length. Is needed to generate the Author Ids
- */
-function randomString(len) 
-{
-  var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  var randomstring = '';
-  for (var i = 0; i < len; i++)
-  {
-    var rnum = Math.floor(Math.random() * chars.length);
-    randomstring += chars.substring(rnum, rnum + 1);
-  }
-  return randomstring;
 }

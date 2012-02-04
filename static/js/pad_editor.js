@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +20,23 @@
  * limitations under the License.
  */
 
+var padcookie = require('/pad_cookie').padcookie;
+var padutils = require('/pad_utils').padutils;
 
 var padeditor = (function()
 {
+  var Ace2Editor = undefined;
+  var pad = undefined;
+  var settings = undefined;
   var self = {
     ace: null,
     // this is accessed directly from other files
     viewZoom: 100,
-    init: function(readyFunc, initialViewOptions)
+    init: function(readyFunc, initialViewOptions, _pad)
     {
+      Ace2Editor = require('/ace').Ace2Editor;
+      pad = _pad;
+      settings = pad.settings;
 
       function aceReady()
       {
@@ -61,6 +75,8 @@ var padeditor = (function()
       {
         pad.changeViewOption('useMonospaceFont', $("#viewfontmenu").val() == 'monospace');
       });
+
+      settings.noColors = !settings.noColors; // Inversed so we can pass it to showauthorcolors
     },
     setViewOptions: function(newOptions)
     {
@@ -71,6 +87,11 @@ var padeditor = (function()
         if (value == "false") return false;
         return defaultValue;
       }
+
+      self.ace.setProperty("showsauthorcolors", settings.noColors);
+
+      self.ace.setProperty("rtlIsTrue", settings.rtlIsTrue);
+
       var v;
 
       v = getOption('showLineNumbers', true);
@@ -120,6 +141,7 @@ var padeditor = (function()
       if (self.ace)
       {
         self.ace.destroy();
+        self.ace = null;
       }
     },
     disable: function()
@@ -138,3 +160,5 @@ var padeditor = (function()
   };
   return self;
 }());
+
+exports.padeditor = padeditor;

@@ -4,6 +4,7 @@ var ueberDB = require("ueberDB");
 var mysql = require("mysql");
 var async = require("async");
 var Changeset = require("../node/utils/Changeset");
+var randomString = require("../node/utils/randomstring");
 var AttributePoolFactory = require("../node/utils/AttributePoolFactory");
 
 var settingsFile = process.argv[2];
@@ -52,7 +53,7 @@ async.series([
   {
     log("get all padIds out of the database...");
     
-    etherpadDB.query("SELECT ID FROM PAD_META LIMIT", [], function(err, _padIDs)
+    etherpadDB.query("SELECT ID FROM PAD_META", [], function(err, _padIDs)
     {
       padIDs = _padIDs;
       callback(err);
@@ -153,11 +154,14 @@ function convertPad(padId, callback)
           {
             if(!err) 
             {
-              //parse the pages
-              for(var i=0,length=results.length;i<length;i++)
+              try
               {
-                parsePage(chatMessages, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, true);
-              }
+                //parse the pages
+                for(var i=0,length=results.length;i<length;i++)
+                {
+                  parsePage(chatMessages, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, true);
+                }
+              }catch(e) {err = e}
             }
             
             callback(err);
@@ -172,11 +176,14 @@ function convertPad(padId, callback)
           {
             if(!err) 
             {
-              //parse the pages
-              for(var i=0,length=results.length;i<length;i++)
+              try
               {
-                parsePage(changesets, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, false);
-              }
+                //parse the pages
+                for(var i=0,length=results.length;i<length;i++)
+                {
+                  parsePage(changesets, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, false);
+                }
+              }catch(e) {err = e}
             }
             
             callback(err);
@@ -191,11 +198,14 @@ function convertPad(padId, callback)
           {
             if(!err) 
             {
-              //parse the pages
-              for(var i=0,length=results.length;i<length;i++)
+              try
               {
-                parsePage(changesetsMeta, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, true);
-              }
+                //parse the pages
+                for(var i=0,length=results.length;i<length;i++)
+                {
+                  parsePage(changesetsMeta, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, true);
+                }
+              }catch(e) {err = e}
             }
             
             callback(err);
@@ -210,7 +220,10 @@ function convertPad(padId, callback)
           {
             if(!err)
             {
-              apool=JSON.parse(results[0].JSON).x;
+              try
+              {
+                apool=JSON.parse(results[0].JSON).x;
+              }catch(e) {err = e}
             }
             
             callback(err);
@@ -225,11 +238,14 @@ function convertPad(padId, callback)
           {
             if(!err) 
             {
-              //parse the pages
-              for(var i=0, length=results.length;i<length;i++)
+              try
               {
-                parsePage(authors, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, true);
-              }
+                //parse the pages
+                for(var i=0, length=results.length;i<length;i++)
+                {
+                  parsePage(authors, results[i].PAGESTART, results[i].OFFSETS, results[i].DATA, true);
+                }
+              }catch(e) {err = e}
             }
             
             callback(err);
@@ -244,7 +260,10 @@ function convertPad(padId, callback)
           {
             if(!err) 
             {
-              padmeta = JSON.parse(results[0].JSON).x;
+              try
+              {
+                padmeta = JSON.parse(results[0].JSON).x;
+              }catch(e) {err = e}
             }
             
             callback(err);
@@ -431,19 +450,4 @@ function parsePage(array, pageStart, offsets, data, json)
     //update start
     start+=unitLength;
   }
-}
-
-/**
- * Generates a random String with the given length. Is needed to generate the Author Ids
- */
-function randomString(len) 
-{
-  var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  var randomstring = '';
-  for (var i = 0; i < len; i++)
-  {
-    var rnum = Math.floor(Math.random() * chars.length);
-    randomstring += chars.substring(rnum, rnum + 1);
-  }
-  return randomstring;
 }

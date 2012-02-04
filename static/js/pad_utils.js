@@ -1,4 +1,10 @@
 /**
+ * This code is mostly from the old Etherpad. Please help us to comment this code. 
+ * This helps other people to understand this code better and helps them to improve it.
+ * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
+ */
+
+/**
  * Copyright 2009 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,10 +23,18 @@
 var padutils = {
   escapeHtml: function(x)
   {
-    return String(x).replace(/\</g, '&lt;').replace(/\>/g, '&gt;');
+    return String(x).replace(/[&"<>]/g, function (c) {
+      return {
+        '&': '&amp;',
+        '"': '&quot;',
+        '<': '&lt;',
+        '>': '&gt;'
+      }[c] || c;
+    });
   },
   uniqueId: function()
   {
+    var pad = require('/pad').pad; // Sidestep circular dependency
     function encodeNum(n, width)
     {
       // returns string that is exactly 'width' chars, padding with zeros
@@ -96,24 +110,6 @@ var padutils = {
     var x = ua.split(' ')[0];
     return clean(x);
   },
-  // "func" is a function over 0..(numItems-1) that is monotonically
-  // "increasing" with index (false, then true).  Finds the boundary
-  // between false and true, a number between 0 and numItems inclusive.
-  binarySearch: function(numItems, func)
-  {
-    if (numItems < 1) return 0;
-    if (func(0)) return 0;
-    if (!func(numItems - 1)) return numItems;
-    var low = 0; // func(low) is always false
-    var high = numItems - 1; // func(high) is always true
-    while ((high - low) > 1)
-    {
-      var x = Math.floor((low + high) / 2); // x != low, x != high
-      if (func(x)) high = x;
-      else low = x;
-    }
-    return high;
-  },
   // e.g. "Thu Jun 18 2009 13:09"
   simpleDateTime: function(date)
   {
@@ -174,7 +170,7 @@ var padutils = {
         var startIndex = urls[j][0];
         var href = urls[j][1];
         advanceTo(startIndex);
-        pieces.push('<a ', (target ? 'target="' + target + '" ' : ''), 'href="', href.replace(/\"/g, '&quot;'), '">');
+        pieces.push('<a ', (target ? 'target="' + target + '" ' : ''), 'href="', padutils.escapeHtml(href), '">');
         advanceTo(startIndex + href.length);
         pieces.push('</a>');
       }
@@ -213,6 +209,7 @@ var padutils = {
   },
   timediff: function(d)
   {
+    var pad = require('/pad').pad; // Sidestep circular dependency
     function format(n, word)
     {
       n = Math.round(n);
@@ -462,14 +459,26 @@ var padutils = {
   }
 };
 
-//send javascript errors to the server
-window.onerror = function test (msg, url, linenumber)
-{
- var errObj = {errorInfo: JSON.stringify({msg: msg, url: url, linenumber: linenumber, userAgent: navigator.userAgent})};
- var loc = document.location;
- var url = loc.protocol + "//" + loc.hostname + ":" + loc.port + "/" + loc.pathname.substr(1, loc.pathname.indexOf("/p/")) + "jserror";
+var globalExceptionHandler = undefined;
+function setupGlobalExceptionHandler() {
+  //send javascript errors to the server
+  if (!globalExceptionHandler) {
+    globalExceptionHandler = function test (msg, url, linenumber)
+    {
+     var errObj = {errorInfo: JSON.stringify({msg: msg, url: url, linenumber: linenumber, userAgent: navigator.userAgent})};
+     var loc = document.location;
+     var url = loc.protocol + "//" + loc.hostname + ":" + loc.port + "/" + loc.pathname.substr(1, loc.pathname.indexOf("/p/")) + "jserror";
  
- $.post(url, errObj);
+     $.post(url, errObj);
  
- return false;
-};
+     return false;
+    };
+    window.onerror = globalExceptionHandler;
+  }
+}
+
+padutils.setupGlobalExceptionHandler = setupGlobalExceptionHandler;
+
+padutils.binarySearch = require('/ace2_common').binarySearch;
+
+exports.padutils = padutils;
