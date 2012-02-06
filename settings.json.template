@@ -47,5 +47,8 @@
   // "httpAuth" : "user:pass",
 
   /* The log level we are using, can be: DEBUG, INFO, WARN, ERROR */
-  "loglevel": "INFO"
+  "loglevel": "INFO",
+
+  /* The xhr-polling duration, default value is 20. */
+  "pollingDuration" : 20
 }
