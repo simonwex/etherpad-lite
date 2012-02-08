@@ -21,6 +21,7 @@
   , "chat.js"
   , "excanvas.js"
   , "farbtastic.js"
+  , "prefixfree.js"
   ]
 , "timeslider.js": [
     "jquery.js"
@@ -46,5 +47,19 @@
   , "broadcast_slider.js"
   , "broadcast_revisions.js"
   , "timeslider.js"
+  ]
+, "ace2_inner.js": [
+    "ace2_common.js"
+  , "skiplist.js"
+  , "virtual_lines.js"
+  , "easysync2.js"
+  , "cssmanager.js"
+  , "colorutils.js"
+  , "undomodule.js"
+  , "contentcollector.js"
+  , "changesettracker.js"
+  , "linestylefilter.js"
+  , "domline.js"
+  , "ace2_inner.js"
   ]
 }
