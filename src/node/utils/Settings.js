@@ -101,12 +101,15 @@ exports.abiwordAvailable = function()
   }
 }
 
+<<<<<<< HEAD:src/node/utils/Settings.js
 // Discover where the settings file lives
 var settingsFilename = argv.settings || "settings.json";
 if (settingsFilename.charAt(0) != '/') {
     settingsFilename = path.normalize(path.join(root, settingsFilename));
 }
 =======
+=======
+>>>>>>> 71c4c6453a9bba551f4ff8ac1dcbbd3854e6372a:node/utils/Settings.js
 /**
  * xhr-polling duration
  */
@@ -164,34 +167,34 @@ for(var i in settings)
 }
 
 if(exports.dbType === "dirty"){
-  console.warn("DirtyDB is used. This is fine for testing but not recommended for production.")
+  console.warn("DirtyDB is used. This is fine for testing but not recommended for production.");
 }
 
 // If deployed in CloudFoundry
 if(process.env.VCAP_APP_PORT) {
-  exports.port = process.env.VCAP_APP_PORT
+  exports.port = process.env.VCAP_APP_PORT;
 }
-
 
 // use mysql if provided.
 var vcapServices = process.env.VCAP_SERVICES;
 
 if(vcapServices) {
-  console.log("env VCAP_SERVICES:" + console.dir(vcapServices))
-  var svcs = JSON.parse(vcapServices)
+  var svcs = JSON.parse(vcapServices);
+
   for(var key in svcs ) {
     var svc = svcs[key]
-    console.log("service:" + svc)
+    
     if( key.match(/^mysql/) ) {
       exports.dbType= "mysql";
-      var cred = svc[0].credentials
+      var cred = svc[0].credentials;
       exports.dbSettings = {
-        "user" : cred.user ,
-        "host" : cred.host ,
-        "password" : cred.password ,
-        "database" : cred.name ,
+        "user" : cred.user,
+        "host" : cred.host,
+        "password" : cred.password,
+        "database" : cred.name,
       };
     }
-    console.debug("database setup:" + console.dir(exports.dbSettings))
+
+    console.debug("database setup:" + console.dir(exports.dbSettings));
   }
 }
